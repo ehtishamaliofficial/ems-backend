@@ -21,7 +21,7 @@ VALUES (
     'ERP-000001',
     'superadmin',
     'superadmin@nadra.gov.pk',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMye1XyjKR6oGGk.2eC5/pqJn0Syl2XyO6C',
+    '$2a$10$ENcA01D9hJsmGCv0i3QoFuVjJZBL5.xe9fUguaqx1X/AvO7kKUVva',
     'System',
     'Administrator',
     TRUE,
