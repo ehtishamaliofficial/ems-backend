@@ -1,6 +1,7 @@
 package com.nadra.ems.domain.port.in;
 
-import java.util.Map;
+import com.nadra.ems.domain.model.AuthTokenResult;
+import com.nadra.ems.domain.model.TwoFactorSetupResult;
 
 /**
  * Driving port — use case for managing TOTP-based two-factor authentication.
@@ -15,9 +16,9 @@ public interface TwoFactorUseCase {
      * (secret key + QR code URI) for the authenticator app.
      *
      * @param userId the user's ID
-     * @return map containing {@code secret} and {@code qrCodeUri}
+     * @return {@link TwoFactorSetupResult} containing setup details and QR code URI
      */
-    Map<String, String> setupTwoFactor(Long userId);
+    TwoFactorSetupResult setupTwoFactor(Long userId);
 
     /**
      * Enables 2FA for the user after verifying the TOTP code from their authenticator app.
@@ -26,7 +27,7 @@ public interface TwoFactorUseCase {
      * @param userId   the user's ID
      * @param totpCode the 6-digit code from the authenticator app
      * @param clientIp the client's IP address (for audit logging)
-     * @return map with {@code accessToken}, {@code refreshToken}, {@code tokenType}, {@code expiresIn}
+     * @return {@link AuthTokenResult} containing access and refresh tokens
      */
-    Map<String, Object> enableTwoFactor(Long userId, String totpCode, String clientIp);
+    AuthTokenResult enableTwoFactor(Long userId, String totpCode, String clientIp);
 }

@@ -1,6 +1,8 @@
 package com.nadra.ems.domain.service;
 
+import com.nadra.ems.domain.model.AuthTokenResult;
 import com.nadra.ems.domain.model.Role;
+import com.nadra.ems.domain.model.TwoFactorSetupResult;
 import com.nadra.ems.domain.model.User;
 import com.nadra.ems.domain.port.in.TwoFactorUseCase;
 import com.nadra.ems.domain.port.out.RoleRepository;
@@ -21,9 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import static dev.samstevens.totp.util.Utils.getDataUriForImage;
 
@@ -60,7 +60,7 @@ public class TwoFactorService implements TwoFactorUseCase {
     // ── TwoFactorUseCase ────────────────────────────────────────────────────
 
     @Override
-    public Map<String, String> setupTwoFactor(Long userId) {
+    public TwoFactorSetupResult setupTwoFactor(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
@@ -94,17 +94,17 @@ public class TwoFactorService implements TwoFactorUseCase {
 
         log.info("2FA setup initiated for userId={}", userId);
 
-        Map<String, String> result = new LinkedHashMap<>();
-        result.put("secret", secret);
-        result.put("qrCodeDataUri", qrCodeDataUri);
-        result.put("manualEntryKey", secret);
-        result.put("issuer", issuer);
-        result.put("accountName", user.getEmail());
-        return result;
+        return new TwoFactorSetupResult(
+                secret,
+                qrCodeDataUri,
+                secret,
+                issuer,
+                user.getEmail()
+        );
     }
 
     @Override
-    public Map<String, Object> enableTwoFactor(Long userId, String totpCode, String clientIp) {
+    public AuthTokenResult enableTwoFactor(Long userId, String totpCode, String clientIp) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 

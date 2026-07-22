@@ -1,6 +1,6 @@
 package com.nadra.ems.adapter.in.web.dto;
 
-import java.util.Map;
+import com.nadra.ems.domain.model.AuthTokenResult;
 
 /**
  * Response DTO for endpoints that issue full access + refresh tokens
@@ -14,14 +14,17 @@ public record TokenResponse(
 ) {
 
     /**
-     * Creates a TokenResponse from the auth service result map.
+     * Creates a TokenResponse from an AuthTokenResult domain model.
      */
-    public static TokenResponse fromMap(Map<String, Object> result) {
+    public static TokenResponse fromDomain(AuthTokenResult result) {
+        if (result == null) {
+            return null;
+        }
         return new TokenResponse(
-                (String) result.get("accessToken"),
-                (String) result.get("refreshToken"),
-                (String) result.get("tokenType"),
-                ((Number) result.get("expiresIn")).longValue()
+                result.accessToken(),
+                result.refreshToken(),
+                result.tokenType(),
+                result.expiresIn()
         );
     }
 }

@@ -1,5 +1,7 @@
 package com.nadra.ems.domain.service;
 
+import com.nadra.ems.domain.model.AuthTokenResult;
+import com.nadra.ems.domain.model.LoginResult;
 import com.nadra.ems.domain.model.RefreshToken;
 import com.nadra.ems.domain.model.Role;
 import com.nadra.ems.domain.model.User;
@@ -13,13 +15,11 @@ import com.nadra.ems.domain.port.out.UserRepository;
 import com.nadra.ems.infrastructure.security.JwtTokenProvider;
 import com.nadra.ems.common.exception.*;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.List;
 
 /**
  * Core domain service implementing authentication use cases:
@@ -103,7 +103,7 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshTo
     // ── LoginUseCase ────────────────────────────────────────────────────────
 
     @Override
-    public Map<String, Object> login(String erp, String rawPassword, String clientIp) {
+    public LoginResult login(String erp, String rawPassword, String clientIp) {
         log.info("Login attempt: identifier={}, ip={}", erp, clientIp);
 
         // Find user by username or email
@@ -137,27 +137,21 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshTo
         userRepository.resetFailedAttempts(user.getId());
 
         // Always return a scoped token — never issue full tokens from login
-        Map<String, Object> result = new LinkedHashMap<>();
-
         if (user.isTwoFactorEnabled()) {
             // 2FA is already set up — user must verify TOTP
             String scopedToken = jwtTokenProvider.generateScopedToken(user.getId(), "2FA_VERIFY");
-            result.put("token", scopedToken);
-            result.put("twoFactorEnabled", true);
             log.info("Login scoped token issued (2FA_VERIFY) for userId={}", user.getId());
+            return new LoginResult(scopedToken, true);
         } else {
             // 2FA not yet set up — user must complete setup
             String scopedToken = jwtTokenProvider.generateScopedToken(user.getId(), "2FA_SETUP");
-            result.put("token", scopedToken);
-            result.put("twoFactorEnabled", false);
             log.info("Login scoped token issued (2FA_SETUP) for userId={}", user.getId());
+            return new LoginResult(scopedToken, false);
         }
-
-        return result;
     }
 
     @Override
-    public Map<String, Object> verifyTwoFactorLogin(String twoFactorToken, String totpCode, String clientIp) {
+    public AuthTokenResult verifyTwoFactorLogin(String twoFactorToken, String totpCode, String clientIp) {
         // Validate the scoped 2FA_VERIFY token
         Long userId = jwtTokenProvider.validateScopedToken(twoFactorToken, "2FA_VERIFY");
         if (userId == null) {
@@ -184,7 +178,7 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshTo
     // ── RefreshTokenUseCase ─────────────────────────────────────────────────
 
     @Override
-    public Map<String, String> refreshAccessToken(String refreshToken) {
+    public AuthTokenResult refreshAccessToken(String refreshToken) {
         String tokenHash = tokenService.hashToken(refreshToken);
 
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
@@ -218,10 +212,8 @@ public class AuthService implements RegisterUserUseCase, LoginUseCase, RefreshTo
 
         log.info("Token refreshed for userId={}", user.getId());
 
-        Map<String, String> tokens = new LinkedHashMap<>();
-        tokens.put("accessToken", newAccessToken);
-        tokens.put("refreshToken", newRefreshToken);
-        return tokens;
+        long expiresInSeconds = jwtTokenProvider.getAccessTokenExpirationMs() / 1000;
+        return new AuthTokenResult(newAccessToken, newRefreshToken, "Bearer", expiresInSeconds);
     }
 
     @Override

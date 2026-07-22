@@ -1,5 +1,6 @@
 package com.nadra.ems.domain.service;
 
+import com.nadra.ems.domain.model.AuthTokenResult;
 import com.nadra.ems.domain.model.RefreshToken;
 import com.nadra.ems.domain.model.User;
 import com.nadra.ems.domain.port.out.RefreshTokenRepository;
@@ -15,8 +16,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * Shared service for issuing access + refresh token pairs.
@@ -48,9 +47,9 @@ public class TokenService {
      *
      * @param user     the authenticated user (with roles loaded)
      * @param clientIp the client's IP address for audit
-     * @return map with accessToken, refreshToken, tokenType, expiresIn
+     * @return {@link AuthTokenResult} containing access and refresh tokens
      */
-    public Map<String, Object> issueTokens(User user, String clientIp) {
+    public AuthTokenResult issueTokens(User user, String clientIp) {
         String accessToken = jwtTokenProvider.generateAccessToken(user);
         String refreshToken = jwtTokenProvider.generateRefreshToken();
 
@@ -67,12 +66,8 @@ public class TokenService {
 
         log.info("Tokens issued for userId={}, erpNo={}", user.getId(), user.getErpNo());
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("accessToken", accessToken);
-        result.put("refreshToken", refreshToken);
-        result.put("tokenType", "Bearer");
-        result.put("expiresIn", jwtTokenProvider.getAccessTokenExpirationMs() / 1000);
-        return result;
+        long expiresInSeconds = jwtTokenProvider.getAccessTokenExpirationMs() / 1000;
+        return new AuthTokenResult(accessToken, refreshToken, "Bearer", expiresInSeconds);
     }
 
     /**

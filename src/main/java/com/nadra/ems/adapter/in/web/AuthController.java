@@ -2,7 +2,7 @@ package com.nadra.ems.adapter.in.web;
 
 import com.nadra.ems.adapter.in.web.dto.*;
 import com.nadra.ems.adapter.in.web.mapper.AuthDtoMapper;
-import com.nadra.ems.domain.model.User;
+import com.nadra.ems.domain.model.*;
 import com.nadra.ems.domain.port.in.LoginUseCase;
 import com.nadra.ems.domain.port.in.RefreshTokenUseCase;
 import com.nadra.ems.domain.port.in.RegisterUserUseCase;
@@ -20,8 +20,6 @@ import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-
-import java.util.Map;
 
 /**
  * Driving adapter — REST controller for authentication endpoints.
@@ -61,7 +59,7 @@ public class AuthController {
 
     @Operation(summary = "Register a new user", description = "Creates a new employee account.")
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> register(
+    public ResponseEntity<ApiResponse<UserSummaryResponse>> register(
             @Valid @RequestBody RegisterRequest request) {
 
         log.info("Registration request: username={}, erpNo={}", request.username(), request.erpNo());
@@ -90,13 +88,10 @@ public class AuthController {
         log.info("Login request: identifier={}", request.usernameOrEmail());
         String clientIp = getClientIp(httpRequest);
 
-        Map<String, Object> result = loginUseCase.login(
+        LoginResult result = loginUseCase.login(
                 request.usernameOrEmail(), request.password(), clientIp);
 
-        LoginResponse response = new LoginResponse(
-                (String) result.get("token"),
-                (Boolean) result.get("twoFactorEnabled")
-        );
+        LoginResponse response = AuthDtoMapper.toLoginResponse(result);
 
         String message = response.twoFactorEnabled()
                 ? "Two-factor verification required"
@@ -122,10 +117,10 @@ public class AuthController {
         String clientIp = getClientIp(httpRequest);
         log.info("2FA verification request");
 
-        Map<String, Object> result = loginUseCase.verifyTwoFactorLogin(
+        AuthTokenResult result = loginUseCase.verifyTwoFactorLogin(
                 scopedToken, request.totpCode(), clientIp);
 
-        TokenResponse response = TokenResponse.fromMap(result);
+        TokenResponse response = AuthDtoMapper.toTokenResponse(result);
         return ResponseEntity.ok(ApiResponse.success(response, "Two-factor authentication verified. Login successful"));
     }
 
@@ -133,12 +128,13 @@ public class AuthController {
 
     @Operation(summary = "Refresh access token", description = "Generates a new access token using a valid refresh token.")
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<Map<String, String>>> refreshToken(
+    public ResponseEntity<ApiResponse<RefreshTokenResponse>> refreshToken(
             @Valid @RequestBody RefreshTokenRequest request) {
 
         log.info("Token refresh request");
-        Map<String, String> tokens = refreshTokenUseCase.refreshAccessToken(request.refreshToken());
-        return ResponseEntity.ok(ApiResponse.success(tokens, "Token refreshed successfully"));
+        AuthTokenResult result = refreshTokenUseCase.refreshAccessToken(request.refreshToken());
+        RefreshTokenResponse response = AuthDtoMapper.toRefreshTokenResponse(result);
+        return ResponseEntity.ok(ApiResponse.success(response, "Token refreshed successfully"));
     }
 
     // ── 2FA Setup (first-time users) ────────────────────────────────────────
@@ -154,7 +150,7 @@ public class AuthController {
         Long userId = extractUserIdFromToken(authHeader);
         log.info("2FA setup request for userId={}", userId);
 
-        Map<String, String> setupResult = twoFactorUseCase.setupTwoFactor(userId);
+        TwoFactorSetupResult setupResult = twoFactorUseCase.setupTwoFactor(userId);
         TwoFactorSetupResponse response = AuthDtoMapper.toTwoFactorSetupResponse(setupResult);
 
         return ResponseEntity.ok(ApiResponse.success(response, "Scan the QR code with your authenticator app"));
@@ -168,16 +164,15 @@ public class AuthController {
     @PostMapping("/2fa/enable")
     public ResponseEntity<ApiResponse<TokenResponse>> enableTwoFactor(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody TwoFactorEnableRequest request,
             HttpServletRequest httpRequest) {
 
         Long userId = extractUserIdFromToken(authHeader);
-        String totpCode = body.get("totpCode");
         String clientIp = getClientIp(httpRequest);
         log.info("2FA enable request for userId={}", userId);
 
-        Map<String, Object> result = twoFactorUseCase.enableTwoFactor(userId, totpCode, clientIp);
-        TokenResponse response = TokenResponse.fromMap(result);
+        AuthTokenResult result = twoFactorUseCase.enableTwoFactor(userId, request.totpCode(), clientIp);
+        TokenResponse response = AuthDtoMapper.toTokenResponse(result);
 
         return ResponseEntity.ok(ApiResponse.success(response, "Two-factor authentication enabled. Login successful"));
     }
